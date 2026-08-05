@@ -8,20 +8,12 @@ const MSK_TIMEZONE = 'Europe/Moscow';
 /** Конфигурация поездок — даты/время заданы в MSK */
 const TRIPS = [
   {
-    id: 'pasha-diana',
-    title: 'Поездка Паша и Диана',
-    departure: createMSKDate(2026, 7, 7, 22, 5, 0),
-    arrival: createMSKDate(2026, 7, 8, 8, 3, 0),
-    departureLabel: '07.07.2026 · 22:05',
-    arrivalLabel: '08.07.2026 · 08:03',
-  },
-  {
     id: 'vlad',
     title: 'Поездка Влад',
-    departure: createMSKDate(2026, 7, 8, 2, 4, 0),
-    arrival: createMSKDate(2026, 7, 8, 10, 16, 0),
-    departureLabel: '08.07.2026 · 02:04',
-    arrivalLabel: '08.07.2026 · 10:16',
+    departure: createMSKDate(2026, 8, 9, 14, 35, 0),
+    arrival: createMSKDate(2026, 8, 10, 6, 10, 0),
+    departureLabel: '09.08.2026 · 14:35',
+    arrivalLabel: '10.08.2026 · 6:10',
   },
 ];
 
