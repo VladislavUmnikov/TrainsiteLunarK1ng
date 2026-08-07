@@ -5,17 +5,8 @@
 
 const MSK_TIMEZONE = 'Europe/Moscow';
 
-/** Конфигурация поездок — даты/время заданы в MSK */
-const TRIPS = [
-  {
-    id: 'vlad',
-    title: 'Поездка Влад',
-    departure: createMSKDate(2026, 8, 9, 14, 35, 0),
-    arrival: createMSKDate(2026, 8, 10, 6, 10, 0),
-    departureLabel: '09.08.2026 · 14:35',
-    arrivalLabel: '10.08.2026 · 6:10',
-  },
-];
+/** Поездки загружаются из data/trips.json — публичная часть не хранит их в коде. */
+const TRIPS_URL = './data/trips.json';
 
 /**
  * Создаёт объект Date из компонентов московского времени.
@@ -25,6 +16,40 @@ function createMSKDate(year, month, day, hour, minute, second = 0) {
   const pad = (n) => String(n).padStart(2, '0');
   const iso = `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}+03:00`;
   return new Date(iso);
+}
+
+/** Преобразует статическую запись в формат, который используют существующие таймеры. */
+function normalizeTrip(trip) {
+  const [departureYear, departureMonth, departureDay] = trip.departureDate.split('-').map(Number);
+  const [departureHour, departureMinute] = trip.departureTime.split(':').map(Number);
+  const [arrivalYear, arrivalMonth, arrivalDay] = trip.arrivalDate.split('-').map(Number);
+  const [arrivalHour, arrivalMinute] = trip.arrivalTime.split(':').map(Number);
+  const offset = trip.utcOffset || '+03:00';
+  const makeDate = (year, month, day, hour, minute) => {
+    const pad = (value) => String(value).padStart(2, '0');
+    return new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00${offset}`);
+  };
+  const displayDate = (date, time) => {
+    const [year, month, day] = date.split('-');
+    const [hours, minutes] = time.split(':');
+    return `${day}.${month}.${year} · ${Number(hours)}:${minutes}`;
+  };
+
+  return {
+    ...trip,
+    departure: makeDate(departureYear, departureMonth, departureDay, departureHour, departureMinute),
+    arrival: makeDate(arrivalYear, arrivalMonth, arrivalDay, arrivalHour, arrivalMinute),
+    departureLabel: displayDate(trip.departureDate, trip.departureTime),
+    arrivalLabel: displayDate(trip.arrivalDate, trip.arrivalTime),
+  };
+}
+
+async function loadTrips() {
+  const response = await fetch(TRIPS_URL, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Trips request failed: ${response.status}`);
+  const records = await response.json();
+  if (!Array.isArray(records)) throw new Error('Trips data must be an array');
+  return records.map(normalizeTrip);
 }
 
 /**
@@ -235,11 +260,20 @@ function updateTripCard(card, trip, now) {
 }
 
 /** Инициализация приложения */
-function init() {
+async function init() {
   const cardsRoot = document.getElementById('trip-cards');
   const clockEl = document.getElementById('msk-clock');
 
-  cardsRoot.innerHTML = TRIPS.map(renderTripCard).join('');
+  let trips;
+  try {
+    trips = await loadTrips();
+  } catch (error) {
+    console.error(error);
+    cardsRoot.innerHTML = '<p class="status-badge status-badge--departed">Не удалось загрузить расписание.</p>';
+    return;
+  }
+
+  cardsRoot.innerHTML = trips.map(renderTripCard).join('');
   const cardElements = [...cardsRoot.querySelectorAll('.trip-card')];
 
   function tick() {
@@ -249,7 +283,7 @@ function init() {
     clockEl.setAttribute('datetime', now.toISOString());
 
     cardElements.forEach((card, i) => {
-      updateTripCard(card, TRIPS[i], now);
+      updateTripCard(card, trips[i], now);
     });
   }
 
