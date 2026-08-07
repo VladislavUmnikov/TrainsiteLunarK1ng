@@ -54,6 +54,8 @@ body {
 }
 
 /* ── Ambient background ────────────────────────────────────── */
+/* Layered for passive viewing on a big screen: stars drift, orbs slowly shift
+   colour, a light sweeps past overhead, and a rail track rushes by underfoot. */
 .ambient {
   position: fixed;
   inset: 0;
@@ -62,29 +64,101 @@ body {
   overflow: hidden;
 }
 
+/* Layers 1, 2 and 4 below are the "leave it running on a TV" treatment for the
+   public page only. The admin panel (admin/index.html, body.admin-body) shares
+   this stylesheet but stays on the calmer base look so it's easy to work in. */
+
+/* Layer 1: distant twinkling starfield */
+body:not(.admin-body) .ambient::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background-image:
+    radial-gradient(1.6px 1.6px at 8% 15%, rgba(255, 255, 255, 0.9), transparent 60%),
+    radial-gradient(1.2px 1.2px at 22% 58%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1.6px 1.6px at 41% 9%, rgba(255, 255, 255, 0.85), transparent 60%),
+    radial-gradient(1.1px 1.1px at 58% 42%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1.6px 1.6px at 73% 71%, rgba(255, 255, 255, 0.85), transparent 60%),
+    radial-gradient(1.1px 1.1px at 86% 24%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1.6px 1.6px at 12% 83%, rgba(255, 255, 255, 0.75), transparent 60%),
+    radial-gradient(1.1px 1.1px at 93% 60%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(1.6px 1.6px at 34% 92%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1.1px 1.1px at 63% 30%, rgba(255, 255, 255, 0.5), transparent 60%);
+  background-repeat: repeat;
+  background-size: 420px 420px;
+  animation: stars-drift 160s linear infinite, stars-twinkle 4.5s ease-in-out infinite alternate;
+  opacity: 0.6;
+  will-change: background-position;
+}
+
+@keyframes stars-drift {
+  from { background-position: 0 0; }
+  to { background-position: -420px -260px; }
+}
+
+@keyframes stars-twinkle {
+  from { opacity: 0.4; }
+  to { opacity: 0.75; }
+}
+
+/* Layer 2: soft aurora light sweeping slowly across the whole screen */
+body:not(.admin-body) .ambient::after {
+  content: "";
+  position: absolute;
+  inset: -40% -10%;
+  background: linear-gradient(102deg,
+    transparent 42%,
+    rgba(56, 189, 248, 0.05) 47%,
+    rgba(167, 139, 250, 0.09) 50%,
+    rgba(56, 189, 248, 0.05) 53%,
+    transparent 58%);
+  mix-blend-mode: screen;
+  animation: sweep 16s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0%, 100% { transform: translateX(-22%); }
+  50% { transform: translateX(22%); }
+}
+
+/* Layer 3: drifting orbs. On the public page they also slowly cycle hue, like aurora colour bleed */
 .ambient__orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
   opacity: 0.4;
-  animation: float 18s ease-in-out infinite;
+  animation: float 20s ease-in-out infinite;
+}
+
+body:not(.admin-body) .ambient__orb {
+  animation: float 20s ease-in-out infinite, orb-hue 26s linear infinite;
 }
 
 .ambient__orb--1 {
-  width: 40vmin;
-  height: 40vmin;
+  width: 44vmin;
+  height: 44vmin;
   top: -10%;
   left: -5%;
   background: rgba(34, 211, 238, 0.25);
 }
 
 .ambient__orb--2 {
-  width: 35vmin;
-  height: 35vmin;
+  width: 38vmin;
+  height: 38vmin;
   bottom: -5%;
   right: -5%;
   background: rgba(167, 139, 250, 0.2);
-  animation-delay: -9s;
+  animation-delay: -9s, -13s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4%, 3%) scale(1.08); }
+}
+
+@keyframes orb-hue {
+  from { filter: blur(80px) hue-rotate(0deg); }
+  to { filter: blur(80px) hue-rotate(360deg); }
 }
 
 .ambient__grid {
@@ -97,9 +171,28 @@ body {
   mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black, transparent);
 }
 
-@keyframes float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(3%, 2%) scale(1.05); }
+/* Layer 4: a rail track rushing toward the viewer, anchoring the theme at the horizon */
+body:not(.admin-body) .ambient__grid::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6%;
+  width: 58%;
+  height: 46%;
+  transform: translateX(-50%);
+  clip-path: polygon(47% 0%, 53% 0%, 80% 100%, 20% 100%);
+  background-image:
+    repeating-linear-gradient(rgba(226, 232, 240, 0.16) 0 5px, transparent 5px 34px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.16), rgba(56, 189, 248, 0.02));
+  background-size: 100% 90px, 100% 100%;
+  animation: track-rush 1.6s linear infinite;
+  mask-image: linear-gradient(to top, black 0%, transparent 96%);
+  opacity: 0.55;
+}
+
+@keyframes track-rush {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 90px, 0 0; }
 }
 
 /* ── Dashboard layout ──────────────────────────────────────── */
@@ -843,6 +936,37 @@ body {
   margin-top: 0.2rem;
   color: var(--text-muted);
   font-size: 0.72rem;
+}
+
+/* ── Empty / error schedule state ─────────────────────────── */
+.empty-schedule {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  text-align: center;
+}
+
+.empty-schedule p {
+  margin: 0;
+  max-width: 32ch;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.empty-schedule--error {
+  border-color: rgba(251, 77, 88, 0.3);
+  border-style: solid;
+}
+
+.empty-schedule--error p {
+  color: #fca5ad;
 }
 
 /* ── Mobile polish ─────────────────────────────────────────── */
