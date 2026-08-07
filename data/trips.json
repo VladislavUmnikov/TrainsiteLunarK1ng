@@ -1,1 +1,31 @@
-
+[
+  {
+    "id": "vlad",
+    "title": "Поездка Влад",
+    "description": "Поездка в Санкт-Петербург",
+    "trainNumber": "752А",
+    "trainName": "Сапсан",
+    "trainType": "Высокоскоростной",
+    "carrier": "ОАО «РЖД»",
+    "departureDate": "2026-08-09",
+    "departureTime": "14:35",
+    "arrivalDate": "2026-08-10",
+    "arrivalTime": "06:10",
+    "timezone": "Europe/Moscow",
+    "utcOffset": "+03:00",
+    "status": "active",
+    "color": "#8A2BE2",
+    "image": "",
+    "previewText": "Ожидание отправления",
+    "footerText": "Приятной поездки!",
+    "stops": [
+      { "id": "vlad-moscow", "stationId": "moscow", "stationName": "Москва", "arrivalTime": "", "departureTime": "14:35", "stopDuration": "", "platform": "", "track": "", "delay": 0, "notes": "Начальная станция" },
+      { "id": "vlad-tver", "stationId": "tver", "stationName": "Тверь", "arrivalTime": "16:12", "departureTime": "16:14", "stopDuration": "2 мин", "platform": "", "track": "", "delay": 0, "notes": "" },
+      { "id": "vlad-bologoe", "stationId": "bologoe", "stationName": "Бологое", "arrivalTime": "17:45", "departureTime": "17:48", "stopDuration": "3 мин", "platform": "", "track": "", "delay": 0, "notes": "" },
+      { "id": "vlad-chudovo", "stationId": "chudovo", "stationName": "Чудово", "arrivalTime": "19:28", "departureTime": "19:30", "stopDuration": "2 мин", "platform": "", "track": "", "delay": 0, "notes": "" },
+      { "id": "vlad-spb", "stationId": "saint-petersburg", "stationName": "Санкт-Петербург", "arrivalTime": "06:10", "departureTime": "", "stopDuration": "", "platform": "", "track": "", "delay": 0, "notes": "Конечная станция" }
+    ],
+    "createdAt": "2026-08-07T18:00:00.000Z",
+    "updatedAt": "2026-08-07T18:00:00.000Z"
+  }
+]

@@ -1,0 +1,7 @@
+[
+  { "id": "moscow", "name": "Москва", "city": "Москва", "code": "MSK", "platforms": 24 },
+  { "id": "tver", "name": "Тверь", "city": "Тверь", "code": "TVR", "platforms": 5 },
+  { "id": "bologoe", "name": "Бологое", "city": "Бологое", "code": "BOL", "platforms": 6 },
+  { "id": "chudovo", "name": "Чудово", "city": "Чудово", "code": "CHD", "platforms": 4 },
+  { "id": "saint-petersburg", "name": "Санкт-Петербург", "city": "Санкт-Петербург", "code": "SPB", "platforms": 16 }
+]
