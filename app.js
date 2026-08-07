@@ -9,6 +9,9 @@ const MSK_TIMEZONE = 'Europe/Moscow';
 const TRIPS_URL = './data/trips.json';
 const CMS_TRIPS_STORAGE_KEY = 'trainsite.cms.trips';
 
+/** Как часто фоново проверять расписание на изменения (для страницы, оставленной открытой надолго). */
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 /**
  * Создаёт объект Date из компонентов московского времени.
  * Использует ISO-строку с явным смещением +03:00 (MSK).
@@ -328,22 +331,47 @@ function showTripDetails(trip) {
   dialog.showModal();
 }
 
+/** Разметка для пустого расписания или ошибки загрузки (то и другое может случиться на странице, оставленной надолго открытой) */
+function renderScheduleMessage(text, isError = false) {
+  return `<div class="empty-schedule${isError ? ' empty-schedule--error' : ''}"><p>${escapeHtml(text)}</p></div>`;
+}
+
 /** Инициализация приложения */
 async function init() {
   const cardsRoot = document.getElementById('trip-cards');
   const clockEl = document.getElementById('msk-clock');
 
-  let trips;
+  let trips = [];
+  let cardElements = [];
+
+  function renderCards(nextTrips) {
+    trips = nextTrips;
+    if (!trips.length) {
+      cardsRoot.innerHTML = renderScheduleMessage('Пока нет запланированных поездок. Расписание обновится автоматически, как только появятся новые рейсы.');
+      cardElements = [];
+      return;
+    }
+    cardsRoot.innerHTML = trips.map(renderTripCard).join('');
+    cardElements = [...cardsRoot.querySelectorAll('.trip-card')];
+  }
+
+  let lastSignature;
   try {
-    trips = await loadTrips();
+    const initialTrips = await loadTrips();
+    lastSignature = JSON.stringify(initialTrips);
+    renderCards(initialTrips);
   } catch (error) {
     console.error(error);
-    cardsRoot.innerHTML = '<p class="status-badge status-badge--departed">Не удалось загрузить расписание.</p>';
+    cardsRoot.innerHTML = renderScheduleMessage('Не удалось загрузить расписание. Проверьте подключение и обновите страницу.', true);
     return;
   }
 
-  cardsRoot.innerHTML = trips.map(renderTripCard).join('');
-  const cardElements = [...cardsRoot.querySelectorAll('.trip-card')];
+  // Клик по «Подробнее» открывает модальное окно с полным маршрутом.
+  cardsRoot.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-open-trip]');
+    if (!trigger) return;
+    showTripDetails(trips.find((trip) => trip.id === trigger.dataset.openTrip));
+  });
 
   function tick() {
     const now = new Date(); // абсолютный момент; сравнение с MSK-датами корректно
@@ -358,6 +386,22 @@ async function init() {
 
   tick();
   setInterval(tick, 1000);
+
+  // Страница часто остаётся открытой часами (например, на фоновом экране) —
+  // периодически подтягиваем свежие данные, чтобы изменения из админки
+  // появлялись сами, без ручного обновления страницы.
+  setInterval(async () => {
+    try {
+      const nextTrips = await loadTrips();
+      const nextSignature = JSON.stringify(nextTrips);
+      if (nextSignature === lastSignature) return;
+      lastSignature = nextSignature;
+      renderCards(nextTrips);
+      tick();
+    } catch (error) {
+      console.error('Не удалось обновить расписание:', error);
+    }
+  }, REFRESH_INTERVAL_MS);
 }
 
 init();
