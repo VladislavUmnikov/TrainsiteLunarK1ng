@@ -441,8 +441,21 @@ body {
 
 .progress__track {
   position: relative;
-  height: 56px;
+  height: 62px;
   padding: 0 8px;
+}
+
+/* Sleepers: a quiet rail-tie texture running the width of the track, the page's signature detail */
+.progress__track::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - 7px);
+  left: 8px;
+  right: 8px;
+  height: 14px;
+  background-image: repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.22) 0, rgba(148, 163, 184, 0.22) 2px, transparent 2px, transparent 10px);
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .progress__line {
@@ -468,13 +481,35 @@ body {
 
 .progress__stations {
   position: absolute;
-  top: calc(50% + 14px);
+  top: calc(50% + 16px);
   left: 8px;
   right: 8px;
   display: flex;
   justify-content: space-between;
   font-size: 0.62rem;
   color: var(--text-muted);
+}
+
+.progress__stations span {
+  position: relative;
+  padding-top: 8px;
+}
+
+.progress__stations span::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--trip-accent, var(--accent-cyan));
+  box-shadow: 0 0 6px var(--trip-accent, var(--accent-cyan));
+}
+
+.progress__stations span:last-child::before {
+  left: auto;
+  right: 0;
 }
 
 .progress__train-wrap {
