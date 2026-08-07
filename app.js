@@ -7,6 +7,7 @@ const MSK_TIMEZONE = 'Europe/Moscow';
 
 /** Поездки загружаются из data/trips.json — публичная часть не хранит их в коде. */
 const TRIPS_URL = './data/trips.json';
+const CMS_TRIPS_STORAGE_KEY = 'trainsite.cms.trips';
 
 /**
  * Создаёт объект Date из компонентов московского времени.
@@ -45,11 +46,28 @@ function normalizeTrip(trip) {
 }
 
 async function loadTrips() {
+  try {
+    const localRecords = JSON.parse(localStorage.getItem(CMS_TRIPS_STORAGE_KEY));
+    if (Array.isArray(localRecords)) return localRecords.map(normalizeTrip);
+  } catch {
+    // Повреждённый локальный каталог не должен останавливать публичную страницу.
+  }
+
   const response = await fetch(TRIPS_URL, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Trips request failed: ${response.status}`);
   const records = await response.json();
   if (!Array.isArray(records)) throw new Error('Trips data must be an array');
   return records.map(normalizeTrip);
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  })[character]);
+}
+
+function safeColor(value) {
+  return /^#[0-9a-f]{3,8}$/i.test(value || '') ? value : '#a78bfa';
 }
 
 /**
@@ -117,22 +135,26 @@ function trainSVG() {
 
 /** Рендер одной карточки поездки */
 function renderTripCard(trip) {
+  const stops = trip.stops || [];
+  const routeItems = stops.map((stop, index) => {
+    const time = stop.departureTime || stop.arrivalTime || '—';
+    const detail = stop.stopDuration ? ` · ${stop.stopDuration}` : '';
+    return `<li class="trip-stop${index === 0 ? ' is-origin' : ''}${index === stops.length - 1 ? ' is-destination' : ''}"><span>${index + 1}</span><strong>${escapeHtml(stop.stationName || 'Станция')}</strong><time>${escapeHtml(time)}${escapeHtml(detail)}</time></li>`;
+  }).join('');
+
   return `
-    <article class="trip-card" data-trip-id="${trip.id}">
-      <h2 class="trip-card__title">${trip.title}</h2>
+    <article class="trip-card" data-trip-id="${escapeHtml(trip.id)}" style="--trip-accent: ${safeColor(trip.color)}">
+      <h2 class="trip-card__title">${escapeHtml(trip.title)}</h2>
       <p class="trip-card__meta">
-        <strong>Выезд:</strong> ${trip.departureLabel} MSK<br>
-        <strong>Прибытие:</strong> ${trip.arrivalLabel} MSK
+        <strong>Выезд:</strong> ${escapeHtml(trip.departureLabel)} MSK<br>
+        <strong>Прибытие:</strong> ${escapeHtml(trip.arrivalLabel)} MSK
       </p>
 
-      <div class="timer-block">
-        <p class="timer-block__label">До выезда</p>
-        <div class="timer-departure" data-role="departure-timer"></div>
-      </div>
-
-      <div class="timer-block">
-        <p class="timer-block__label">Путь осталось</p>
-        <div class="timer-transit" data-role="transit-timer"></div>
+      <div class="journey-stages" aria-label="Состояние поездки">
+        <section class="trip-stage"><p class="trip-stage__label">До выезда</p><div data-role="departure-timer"></div></section>
+        <section class="trip-stage"><p class="trip-stage__label">До прибытия</p><div data-role="transit-timer"></div></section>
+        <section class="trip-stage"><p class="trip-stage__label">До станции</p><div data-role="station-status"></div></section>
+        <section class="trip-stage"><p class="trip-stage__label">Стоянка</p><div data-role="stop-status"></div></section>
       </div>
 
       <div class="progress">
@@ -153,11 +175,13 @@ function renderTripCard(trip) {
             </div>
           </div>
           <div class="progress__stations">
-            <span>Отправление</span>
-            <span>Прибытие</span>
+            <span>${escapeHtml(stops[0]?.stationName || 'Отправление')}</span>
+            <span>${escapeHtml(stops.at(-1)?.stationName || 'Прибытие')}</span>
           </div>
         </div>
       </div>
+      <div class="trip-route"><div class="trip-route__heading"><span>Остановки маршрута</span><b>${stops.length}</b></div><ol class="trip-stops">${routeItems || '<li class="trip-stop is-empty">Остановки не добавлены.</li>'}</ol></div>
+      <button class="trip-card__details" type="button" data-open-trip="${escapeHtml(trip.id)}">Подробнее <span>→</span></button>
     </article>
   `;
 }
@@ -222,41 +246,86 @@ function updateTripCard(card, trip, now) {
 
   const depContainer = card.querySelector('[data-role="departure-timer"]');
   const transitContainer = card.querySelector('[data-role="transit-timer"]');
+  const stationContainer = card.querySelector('[data-role="station-status"]');
+  const stopContainer = card.querySelector('[data-role="stop-status"]');
   const fill = card.querySelector('[data-role="progress-fill"]');
   const train = card.querySelector('[data-role="progress-train"]');
   const percentEl = card.querySelector('[data-role="progress-percent"]');
 
   const prefix = trip.id;
+  const percent = getProgressPercent(now, departure, arrival);
+  const stops = trip.stops || [];
+  const nextStopIndex = Math.min(stops.length - 1, Math.max(0, Math.ceil((percent / 100) * Math.max(stops.length - 1, 0))));
+  const nextStop = stops[nextStopIndex];
+  const setStatus = (container, message, modifier = 'waiting') => {
+    container.innerHTML = `<span class="status-badge status-badge--${modifier}">${escapeHtml(message)}</span>`;
+  };
+
+  if (trip.status === 'cancelled') {
+    setStatus(depContainer, 'Поезд отменён', 'cancelled');
+    setStatus(transitContainer, 'Рейс не состоится', 'cancelled');
+    setStatus(stationContainer, 'Движение отменено', 'cancelled');
+    setStatus(stopContainer, 'Нет данных о стоянке', 'cancelled');
+    fill.style.width = '0%'; train.style.left = '0%'; percentEl.textContent = '0%';
+    return;
+  }
+
+  if (trip.status === 'completed' || phase === 'after') {
+    setStatus(depContainer, 'Поезд отправился', 'departed');
+    setStatus(transitContainer, 'Поезд на месте! 🎉', 'arrived');
+    setStatus(stationContainer, `Прибытие: ${stops.at(-1)?.stationName || 'конечная станция'}`, 'arrived');
+    setStatus(stopContainer, trip.footerText || 'Поздравляем, вы доехали!', 'arrived');
+    fill.style.width = '100%'; train.style.left = '100%'; percentEl.textContent = '100%';
+    return;
+  }
 
   // ── Таймер 1: до выезда ──
-  if (phase === 'before') {
+  if (phase === 'before' && trip.status !== 'draft') {
     const remaining = splitDuration(departure - now);
     updateCountdown(depContainer, `${prefix}-dep`, remaining);
   } else if (phase === 'transit') {
-    depContainer.innerHTML =
-      '<span class="status-badge status-badge--transit">Поезд уже в пути</span>';
+    setStatus(depContainer, 'Поезд в пути!', 'transit');
   } else {
-    depContainer.innerHTML =
-      '<span class="status-badge status-badge--departed">Поезд уехал</span>';
+    setStatus(depContainer, 'Поезд не в пути', 'waiting');
   }
 
-  // ── Таймер 2: путь осталось ──
+  // ── Таймер 2: до прибытия ──
   if (phase === 'before') {
-    transitContainer.innerHTML =
-      '<span class="status-badge status-badge--waiting">Ожидание отправления</span>';
+    setStatus(transitContainer, 'Ожидание прибытия', 'waiting');
   } else if (phase === 'transit') {
     const remaining = splitDuration(arrival - now);
     updateCountdown(transitContainer, `${prefix}-transit`, remaining, true);
+  }
+
+  if (phase === 'transit' && nextStop) {
+    setStatus(stationContainer, `Следующая: ${nextStop.stationName}${nextStop.arrivalTime ? ` · ${nextStop.arrivalTime}` : ''}`, 'transit');
+    setStatus(stopContainer, nextStop.stopDuration ? `Стоянка ${nextStop.stopDuration}` : 'Ожидание прибытия станции', 'waiting');
   } else {
-    transitContainer.innerHTML =
-      '<span class="status-badge status-badge--arrived">Прибыли! 🎉</span>';
+    setStatus(stationContainer, 'Поезд не в пути', 'waiting');
+    setStatus(stopContainer, stops[0] ? `Отправление: ${stops[0].stationName}` : 'Остановки не заданы', 'waiting');
   }
 
   // ── Прогресс-бар и поезд ──
-  const percent = getProgressPercent(now, departure, arrival);
   fill.style.width = `${percent}%`;
   train.style.left = `${percent}%`;
   percentEl.textContent = `${Math.round(percent)}%`;
+}
+
+function showTripDetails(trip) {
+  if (!trip) return;
+  let dialog = document.getElementById('trip-details-dialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'trip-details-dialog';
+    dialog.className = 'trip-dialog';
+    document.body.append(dialog);
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog || event.target.closest('[data-close-dialog]')) dialog.close();
+    });
+  }
+  const stops = trip.stops || [];
+  dialog.innerHTML = `<div class="trip-dialog__content" style="--trip-accent: ${safeColor(trip.color)}"><button class="trip-dialog__close" type="button" data-close-dialog aria-label="Закрыть">×</button><p class="trip-dialog__eyebrow">${escapeHtml(trip.trainNumber || 'ПОЕЗД')} · ${escapeHtml(trip.trainName || 'Рейс')}</p><h2>${escapeHtml(trip.title)}</h2><p class="trip-dialog__route">${escapeHtml(stops[0]?.stationName || 'Отправление')} → ${escapeHtml(stops.at(-1)?.stationName || 'Прибытие')}</p><ol class="trip-dialog__stops">${stops.map((stop, index) => `<li><span>${String(index + 1).padStart(2, '0')}</span><strong>${escapeHtml(stop.stationName || 'Станция')}</strong><time>${escapeHtml(stop.arrivalTime || '—')} — ${escapeHtml(stop.departureTime || '—')}</time><small>${escapeHtml(stop.stopDuration || 'Без стоянки')}${stop.platform ? ` · платформа ${escapeHtml(stop.platform)}` : ''}${stop.delay ? ` · задержка ${escapeHtml(stop.delay)} мин` : ''}</small></li>`).join('') || '<li>Остановки маршрута пока не добавлены.</li>'}</ol></div>`;
+  dialog.showModal();
 }
 
 /** Инициализация приложения */
